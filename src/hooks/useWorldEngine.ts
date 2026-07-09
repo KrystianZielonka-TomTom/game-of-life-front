@@ -52,6 +52,18 @@ export class WorldEngine {
     this.camera.zoomAt(sx, sy, canvasW, canvasH, factor);
     this.renderer.render();
   }
+
+  panBy(dx: number, dy: number) {
+    this.camera.panBy(dx, dy);
+    this.renderer.render();
+  }
+
+  swapCell(sx: number, sy: number, canvasW: number, canvasH: number) {
+    const coords = this.camera.screenToWorld(sx,sy,canvasW,canvasH);
+    this.store.swapCell(Math.floor(coords.wx), Math.floor(coords.wy));
+    this.renderer.invalidateRegion();
+    this.renderer.render();
+  }
 }
 
 export function useWorldEngine(

@@ -28,6 +28,11 @@ export class Camera {
         }
     }
 
+    panBy(dx, dy) {
+        this.x -= dx / this.zoom;
+        this.y -= dy / this.zoom;
+    }
+
     zoomAt(sx, sy, canvasW, canvasH, factor) {
         const before = this.screenToWorld(sx, sy, canvasW, canvasH);
         this.zoom += factor;

@@ -26,8 +26,22 @@ export default function GameController({
       we.zoomAt(x, y, canvas.width, canvas.height, factor);
     }
 
+    function click(e: MouseEvent) {
+      e.preventDefault();
+
+      const we = worldEngRef.current;
+      if (we == null) return;
+      const rect = canvas.getBoundingClientRect();
+      const x = e.clientX - rect.left;
+      const y = e.clientY - rect.top;
+      we.swapCell(x, y, canvas.width, canvas.height);
+    }
     window.addEventListener("wheel", zoom, { passive: false });
-    return () => window.removeEventListener("wheel", zoom);
+    window.addEventListener("mousedown", click, { passive: false });
+    return () => {
+      window.removeEventListener("wheel", zoom);
+      window.removeEventListener("mousedown", click);
+    };
   }, []);
 
   async function handleRequestData() {

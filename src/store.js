@@ -24,6 +24,22 @@ export class ChunkStore {
         }
     }
 
+    swapCell(x,y) {
+        let cX = Math.floor(x/CHUNK_WIDTH)
+        let cY = Math.floor(y/CHUNK_WIDTH)
+        
+        let lX = floorMod(x, CHUNK_WIDTH)
+        let lY = floorMod(y, CHUNK_WIDTH)
+
+        let chunk = this.getChunk(cX, cY)
+        if (!chunk) {
+            chunk = new Uint8Array(CHUNK_WIDTH*CHUNK_WIDTH)
+            this.storeChunk(cX, cY, chunk)
+        }
+        const current = chunk[lY * CHUNK_WIDTH + lX]
+        chunk[lY * CHUNK_WIDTH + lX] = current == 1 ? 0 : 1
+    }
+
     storeCells(x, y, width, height, data) {
         let a = 0;
         for(let j = 0; j < height; j++) {
