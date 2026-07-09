@@ -64,6 +64,28 @@ export class WorldEngine {
     this.renderer.invalidateRegion();
     this.renderer.render();
   }
+
+  setCell(sx: number, sy: number, canvasW: number, canvasH: number, state: number) {
+    const coords = this.camera.screenToWorld(sx,sy,canvasW,canvasH);
+    this.store.setCell(Math.floor(coords.wx), Math.floor(coords.wy), state);
+    this.renderer.invalidateRegion();
+    this.renderer.render();
+  }
+
+  setCellRect(sx: number, sy: number, size: number, canvasW: number, canvasH: number, state: number) {
+    const coords = this.camera.screenToWorld(sx,sy,canvasW,canvasH);
+    const x = Math.floor(coords.wx)
+    const y = Math.floor(coords.wy)
+
+    for(let i = -size; i < size; i++) {
+        for(let j = -size; j < size; j++) {
+            this.store.setCell(x + i, y + j, state);
+        }
+    }
+    
+    this.renderer.invalidateRegion();
+    this.renderer.render();
+  }
 }
 
 export function useWorldEngine(

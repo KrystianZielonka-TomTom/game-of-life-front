@@ -25,7 +25,6 @@ export async function fetchRandomCells(): Promise<CellPart> {
     const raw = await response.json() as RawCellPart;
 
 
-    console.log(raw)
     return {
         x: raw.x,
         y: raw.y,
