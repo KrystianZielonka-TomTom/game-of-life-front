@@ -2,6 +2,22 @@ import { useEffect, useState, useRef } from "react";
 import { fetchNextState, fetchRandomCells } from "../api/cells";
 import type { WorldEngine } from "../hooks/useWorldEngine";
 import type { WorldDto } from "../types/world";
+import { styled } from "styled-components";
+import {
+  Box,
+  Button,
+  ButtonGroup,
+  Container,
+  FormControl,
+  FormControlLabel,
+  FormGroup,
+  FormLabel,
+  Radio,
+  RadioGroup,
+  Slider,
+  Switch,
+} from "@mui/material";
+import Card from "@mui/material/Card";
 
 export default function GameController({
   canvasRef,
@@ -80,13 +96,13 @@ export default function GameController({
       const x = e.clientX - rect.left;
       const y = e.clientY - rect.top;
 
-      if (paintSizeRef.current == 0) {
+      if (paintSizeRef.current == 1) {
         we.setCell(x, y, canvas.width, canvas.height, paintColorRef.current);
       } else {
         we.setCellRect(
           x,
           y,
-          paintSizeRef.current,
+          Math.floor((paintSizeRef.current - 1) / 2 + 0.5),
           canvas.width,
           canvas.height,
           paintColorRef.current,
@@ -100,15 +116,18 @@ export default function GameController({
         const next = paintColorRef.current === 1 ? 0 : 1;
         paintColorRef.current = next;
         setPaintColor(next);
+        return;
       } else if (e.key === "e") {
         requestNextStep();
         return;
       } else if (e.key === "=" || e.key === "+") {
-        setPaintSize(paintSizeRef.current + 1);
+        let p = paintSizeRef.current - 2;
+        if (p < 1) p = 1;
+        setPaintSize(p);
         return;
       } else if (e.key === "-" || e.key === "_") {
-        let p = paintSizeRef.current - 1;
-        if (p < 0) p = 0;
+        let p = paintSizeRef.current + 2;
+        if (p < 1) p = 1;
         setPaintSize(p);
         return;
       }
@@ -190,19 +209,61 @@ export default function GameController({
 
   return (
     <>
-      <p>I will be controlling the game</p>
-      <p>Brush size is {1 + paintSize * 2}</p>
-      <p>You are painting {paintColor == 1 ? "alive" : "dead"} cells</p>
-      <p>Current step {step} </p>
-      <button onClick={handleRequestData}>Get random state</button>
-      <button onClick={requestNextStep}>Get next state</button>
-      <button
-        onClick={() => {
-          setPlay(play ? false : true);
-        }}
-      >
-        {play ? "Pause simulation" : "Start simulation"}
-      </button>
+      <Card variant="outlined">
+        <Box sx={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)" }}>
+          <FormControl>
+            <FormLabel>Brush (size={paintSize})</FormLabel>
+            <Slider
+              value={paintSize}
+              onChange={(_, v) => {
+                setPaintSize(v as number);
+              }}
+              step={2}
+              min={1}
+              max={80}
+              valueLabelDisplay="auto"
+              marks
+            />
+            <RadioGroup
+              row
+              name="row-radio-buttons-group"
+              value={paintColor ? "alive" : "dead"}
+            >
+              <FormControlLabel
+                value="dead"
+                control={<Radio />}
+                label="Dead"
+                onChange={(_, v) => {
+                  setPaintColor(0);
+                }}
+              />
+              <FormControlLabel
+                value="alive"
+                control={<Radio />}
+                label="Alive"
+                onChange={(_, v) => {
+                  setPaintColor(1);
+                }}
+              />
+            </RadioGroup>
+          </FormControl>
+          <div></div>
+          <ButtonGroup variant="contained" aria-label="Basic button group">
+            <Button onClick={handleRequestData}>Get random state</Button>
+            <Button onClick={requestNextStep}>Get next state</Button>
+            <Button
+              onClick={() => {
+                setPlay(play ? false : true);
+              }}
+            >
+              {play ? "Pause simulation" : "Start simulation"}
+            </Button>
+          </ButtonGroup>
+        </Box>
+        <Container maxWidth="sm">
+          {/* <div>Brush size is {paintSize}</div> */}
+        </Container>
+      </Card>
     </>
   );
 }

@@ -43,16 +43,6 @@ export class Renderer {
 
     invalidateRegion() {
         this.imageStore.clear();
-        // const cxMin = Math.floor(x / CHUNK_WIDTH);
-        // const cyMin = Math.floor(y / CHUNK_WIDTH);
-        // const cxMax = Math.floor((x + width - 1) / CHUNK_WIDTH);
-        // const cyMax = Math.floor((y + height - 1) / CHUNK_WIDTH);
-
-        // for (let cy = cyMin; cy <= cyMax; cy++) {
-        //     for (let cx = cxMin; cx <= cxMax; cx++) {
-        //         this.imageStore.deleteChunk(cx, cy);
-        //     }
-        // }
     }
 
     renderChunkImage(chunkX, chunkY, chunk) {
