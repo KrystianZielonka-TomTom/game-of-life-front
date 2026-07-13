@@ -2,17 +2,25 @@ import {ChunkStore, CHUNK_WIDTH} from './store.js'
 
 export class Renderer {
 
-    constructor(worldStore, ctx, camera, canvasW, canvasH) {
+    constructor(worldStore, heatStore, ctx, camera, canvasW, canvasH) {
         this.imageStore = new ChunkStore()
+        this.heatImageStore = new ChunkStore()
         this.worldStore = worldStore
+        this.heatStore = heatStore;
         this.mainCtx = ctx
         this.camera = camera
         this.canvasW = canvasW
         this.canvasH = canvasH
+        this.enableHeatMap = false;
     }
 
     render() {
-        this.mainCtx.fillStyle = "white"
+        if (this.enableHeatMap) {
+this.mainCtx.fillStyle = "black"
+        } else {
+            this.mainCtx.fillStyle = "white"
+        }
+        
         this.mainCtx.fillRect(0,0, this.canvasW, this.canvasH)
         this.mainCtx.imageSmoothingEnabled = false;
 
@@ -28,14 +36,28 @@ export class Renderer {
         //culling
         for(let cy = cyMin; cy <= cyMax; cy++) {
             for(let cx = cxMin; cx <= cxMax; cx++) {
-                let chunkImg = this.imageStore.getChunk(cx, cy);
-                if(!chunkImg) {
+                let chunkImg = null;
+                if (!this.enableHeatMap) {
+                    chunkImg = this.imageStore.getChunk(cx, cy);
+                    if(!chunkImg) {
                     const chunk = this.worldStore.getChunk(cx, cy)
                     if (!chunk) continue;
 
-                    chunkImg = this.renderChunkImage(cx, cy, chunk);
+                    chunkImg = this.renderChunkImage(chunk);
                     this.imageStore.storeChunk(cx,cy,chunkImg);
+                    }
+                } else {
+                    chunkImg = this.heatImageStore.getChunk(cx, cy);
+                    if(!chunkImg) {
+                    const chunk = this.heatStore.getChunk(cx, cy)
+                    if (!chunk) continue;
+
+                    chunkImg = this.renderChunkHeatImage(chunk);
+                    this.imageStore.storeChunk(cx,cy,chunkImg);
+                    }
                 }
+                
+                
                 this.drawChunk(chunkImg, cx, cy);
             }
         }
@@ -45,7 +67,7 @@ export class Renderer {
         this.imageStore.clear();
     }
 
-    renderChunkImage(chunkX, chunkY, chunk) {
+    renderChunkImage(chunk) {
         const offscreen = new OffscreenCanvas(CHUNK_WIDTH, CHUNK_WIDTH);
         const ctx = offscreen.getContext("2d");
         ctx.fillStyle = "black";
@@ -56,6 +78,27 @@ export class Renderer {
             if (chunk[i] === 1) {
                 ctx.fillRect(x,y,1,1)
             }
+            x++;
+            if(x == CHUNK_WIDTH) {
+                y++;
+                x=0;
+            }
+        }
+
+        return offscreen
+    }
+
+    renderChunkHeatImage(chunk) {
+        const offscreen = new OffscreenCanvas(CHUNK_WIDTH, CHUNK_WIDTH);
+        const ctx = offscreen.getContext("2d");
+        ctx.fillStyle = "black";
+        ctx.imageSmoothingEnabled = false;
+        let x = 0;
+        let y = 0;
+        for(let i = 0; i < CHUNK_WIDTH * CHUNK_WIDTH; i++) {
+            const val = chunk[i];
+            ctx.fillStyle = `rgb(0,${val},0)`
+            ctx.fillRect(x,y,1,1)
             x++;
             if(x == CHUNK_WIDTH) {
                 y++;

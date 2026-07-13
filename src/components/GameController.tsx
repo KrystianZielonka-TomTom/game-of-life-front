@@ -8,9 +8,11 @@ import {
   Button,
   ButtonGroup,
   Card,
+  Checkbox,
   Divider,
   FormControl,
   FormControlLabel,
+  FormGroup,
   FormLabel,
   Radio,
   RadioGroup,
@@ -46,6 +48,8 @@ export default function GameController({
   const [activeChunks, setActiveChunks] = useState<number>(0);
   const [renderTime, setRenderTime] = useState<number>(0);
   const [requestTime, setRequestTime] = useState<number>(0);
+  const [storeHeat, setStoreHeat] = useState<boolean>(false);
+  const [showHeat, setShowHeat] = useState<boolean>(false);
 
   const paintColorRef = useRef(1);
   const paintSizeRef = useRef(1);
@@ -53,6 +57,8 @@ export default function GameController({
   const lastStepTimestampRef = useRef<number | null>(null);
   const isStepPendingRef = useRef(false);
   const stepsPerSecRef = useRef<number>(0);
+  const storeHeatRef = useRef<boolean>(false);
+  const showHeatRef = useRef<boolean>(false);
 
   useEffect(() => {
     paintColorRef.current = paintColor;
@@ -69,6 +75,21 @@ export default function GameController({
   useEffect(() => {
     stepsPerSecRef.current = stepsPerSec;
   }, [stepsPerSec]);
+
+  useEffect(() => {
+    storeHeatRef.current = storeHeat;
+  }, [storeHeat]);
+
+  useEffect(() => {
+    const we = worldEngRef.current;
+    if (we == null) return;
+    if (showHeat) {
+      we.renderer.enableHeatMap = true;
+    } else {
+      we.renderer.enableHeatMap = false;
+    }
+    we.renderer.render();
+  }, [showHeat]);
 
   useEffect(() => {
     if (stepsPerSec == 0) return;
@@ -250,9 +271,12 @@ export default function GameController({
     setRequestTime(performance.now() - before);
 
     before = performance.now();
-    we.store.clear();
-    updateTiming(timingDto.stepMs, timingDto.loadingMs);
+    if (storeHeatRef.current) {
+      we.calcHeat(timingDto.response.tiles);
+    }
+    we.clearStore();
     we.setTiles(timingDto.response.tiles);
+    updateTiming(timingDto.stepMs, timingDto.loadingMs);
     setActiveChunks(we.getActiveChunkCount());
     setStep(stepRef.current + 1);
     setRenderTime(performance.now() - before);
@@ -343,6 +367,18 @@ export default function GameController({
                     setPaintColor(1);
                   }}
                 />
+                <FormControlLabel
+                  checked={showHeat}
+                  onChange={(_, v) => setShowHeat(v)}
+                  control={<Checkbox />}
+                  label="Show heat"
+                ></FormControlLabel>
+                <FormControlLabel
+                  checked={storeHeat}
+                  onChange={(_, v) => setStoreHeat(v)}
+                  control={<Checkbox />}
+                  label="Store heat"
+                ></FormControlLabel>
               </RadioGroup>
             </Box>
             <Box sx={{ flex: 1, minWidth: 220 }}>

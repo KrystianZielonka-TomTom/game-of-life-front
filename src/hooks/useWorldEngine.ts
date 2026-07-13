@@ -9,18 +9,20 @@ export class WorldEngine {
   store: ChunkStore;
   camera: Camera;
   renderer: Renderer;
+  heatMapStore: ChunkStore;
 
   constructor(ctx: CanvasRenderingContext2D, canvasW: number, canvasH: number) {
     this.store = new ChunkStore();
+    this.heatMapStore = new ChunkStore();
     this.camera = new Camera();
-    this.renderer = new Renderer(this.store, ctx, this.camera, canvasW, canvasH);
+    this.renderer = new Renderer(this.store, this.heatMapStore, ctx, this.camera, canvasW, canvasH);
   }
 
-  loadCells(x: number, y: number, width: number, height: number, data: Uint8Array) {
-    this.store.storeCells(x, y, width, height, data);
-    this.renderer.invalidateRegion();
-    this.renderer.render();
-  }
+  // loadCells(x: number, y: number, width: number, height: number, data: Uint8Array) {
+  //   this.store.storeCells(x, y, width, height, data);
+  //   this.renderer.invalidateRegion();
+  //   this.renderer.render();
+  // }
 
   getTiles(): TileDto[] {
     const tiles: TileDto[] = [];
@@ -32,6 +34,27 @@ export class WorldEngine {
       });
     }
     return tiles;
+  }
+
+  calcHeat(nextTiles: TileDto[]) {
+    nextTiles.forEach((t) => {
+      const oldChunk: Uint8Array = this.store.getChunk(t.tileIndexX, t.tileIndexY);
+      const newChunk = t.data;
+      let heatMapChunk: Uint8Array = this.heatMapStore.getChunk(t.tileIndexX, t.tileIndexY);
+      if (heatMapChunk == null) {
+        const c = new Uint8Array(64*64);
+        this.heatMapStore.storeChunk(t.tileIndexX, t.tileIndexY, c);
+        heatMapChunk = c;
+      }
+
+      if (oldChunk != null) {
+      for(let i = 0; i < 64*64; i++) {
+        if (oldChunk[i] != newChunk[i] && heatMapChunk[i] < 255) {
+          heatMapChunk[i] += 1;
+        }
+      }
+    }
+    });
   }
 
   setTiles(tiles: TileDto[]) {
@@ -77,6 +100,9 @@ export class WorldEngine {
 
   getActiveChunkCount(): number {
     return this.store.getCount();
+  }
+  clearStore() {
+    this.store.clear();
   }
 }
 
