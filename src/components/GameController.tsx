@@ -7,17 +7,27 @@ import {
   Box,
   Button,
   ButtonGroup,
-  Container,
+  Card,
+  Divider,
   FormControl,
   FormControlLabel,
-  FormGroup,
   FormLabel,
   Radio,
   RadioGroup,
   Slider,
-  Switch,
+  Stack,
+  Typography,
 } from "@mui/material";
-import Card from "@mui/material/Card";
+
+interface Timing {
+  stepsMs: number;
+  loadingMs: number;
+}
+
+interface SizeData {
+  width: number;
+  height: number;
+}
 
 export default function GameController({
   canvasRef,
@@ -28,12 +38,17 @@ export default function GameController({
 }) {
   const [paintSize, setPaintSize] = useState<number>(1);
   const [paintColor, setPaintColor] = useState<number>(1);
-  const [play, setPlay] = useState<boolean>(false);
   const [step, setStep] = useState<number>(0);
+  const [stepsPerSec, setStepsPerSec] = useState<number>(0);
+  const [actStepsPerSec, setActStepsPerSec] = useState<number | null>(null);
+  const [timingData, setTimingData] = useState<Timing | null>(null);
+  const [sizeData, setSizeData] = useState<SizeData | null>(null);
 
   const paintColorRef = useRef(1);
   const paintSizeRef = useRef(1);
   const stepRef = useRef(0);
+  const lastStepTimestampRef = useRef<number | null>(null);
+  const isStepPendingRef = useRef(false);
 
   useEffect(() => {
     paintColorRef.current = paintColor;
@@ -48,12 +63,15 @@ export default function GameController({
   }, [step]);
 
   useEffect(() => {
-    if (!play) return;
+    if (stepsPerSec == 0) return;
     const id = setInterval(() => {
-      requestNextStep();
-    }, 1000);
+      handleRequestData(reqNext);
+    }, 1000 / stepsPerSec);
+
+    lastStepTimestampRef.current = null;
+
     return () => clearInterval(id);
-  }, [play]);
+  }, [stepsPerSec]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -69,6 +87,7 @@ export default function GameController({
       const y = e.clientY - rect.top;
       const factor = e.deltaY * -0.005;
       we.zoomAt(x, y, canvas.width, canvas.height, factor);
+      updateSizeDisplay(canvas, we);
     }
 
     let leftHeld = false;
@@ -76,6 +95,14 @@ export default function GameController({
       if (e.button != 0) return;
 
       e.preventDefault();
+
+      const we = worldEngRef.current;
+      if (we == null) return;
+      const rect = canvas.getBoundingClientRect();
+      const x = e.clientX - rect.left;
+      const y = e.clientY - rect.top;
+      paint(x, y, we);
+
       leftHeld = true;
     }
 
@@ -95,7 +122,10 @@ export default function GameController({
       const rect = canvas.getBoundingClientRect();
       const x = e.clientX - rect.left;
       const y = e.clientY - rect.top;
+      paint(x, y, we);
+    }
 
+    function paint(x: number, y: number, we: WorldEngine) {
       if (paintSizeRef.current == 1) {
         we.setCell(x, y, canvas.width, canvas.height, paintColorRef.current);
       } else {
@@ -118,7 +148,7 @@ export default function GameController({
         setPaintColor(next);
         return;
       } else if (e.key === "e") {
-        requestNextStep();
+        handleRequestData(reqNext);
         return;
       } else if (e.key === "=" || e.key === "+") {
         let p = paintSizeRef.current - 2;
@@ -153,53 +183,82 @@ export default function GameController({
       we.renderer.render();
     }
 
-    window.addEventListener("wheel", zoom, { passive: false });
-    window.addEventListener("mousedown", click, { passive: false });
+    canvas.addEventListener("wheel", zoom, { passive: false });
+    canvas.addEventListener("mousedown", click, { passive: false });
     window.addEventListener("mouseup", clickUp, { passive: false });
     window.addEventListener("mousemove", mouseMove, { passive: false });
     window.addEventListener("keydown", handleKeyDown, { passive: false });
     return () => {
-      window.removeEventListener("wheel", zoom);
-      window.removeEventListener("mousedown", click);
+      canvas.removeEventListener("wheel", zoom);
+      canvas.removeEventListener("mousedown", click);
       window.removeEventListener("mouseup", clickUp);
       window.removeEventListener("mousemove", mouseMove);
       window.removeEventListener("keydown", handleKeyDown);
     };
   }, []);
 
-  async function handleRequestData() {
-    const we = worldEngRef.current;
-    if (we == null) return;
-    try {
-      const cellPart = await fetchRandomCells();
-      we.loadCells(
-        cellPart.x,
-        cellPart.y,
-        cellPart.width,
-        cellPart.height,
-        cellPart.data,
-      );
-    } catch (err) {
-      console.error(err);
-    }
+  function updateTiming(stepMs: number, loadingMs: number) {
+    setTimingData({ stepsMs: stepMs, loadingMs: loadingMs });
   }
 
-  const isStepPendingRef = useRef(false);
+  async function reqRandom(we: WorldEngine) {
+    const c = canvasRef.current;
+    if (c == null) return;
 
-  async function requestNextStep() {
+    const rect = c.getBoundingClientRect();
+    const corner1 = we.camera.screenToWorld(rect.x, rect.y, c.width, c.height);
+    const corner2 = we.camera.screenToWorld(
+      rect.x + rect.width,
+      rect.y + rect.height,
+      c.width,
+      c.height,
+    );
+
+    const x = corner1.wx;
+    const y = corner1.wy;
+    const width = corner2.wx - corner1.wx;
+    const height = corner2.wy - corner1.wy;
+
+    const timingDto = await fetchRandomCells(x, y, width, height);
+    updateTiming(timingDto.stepMs, timingDto.loadingMs);
+
+    we.setTiles(timingDto.response.tiles);
+    setStep(stepRef.current + 1);
+  }
+
+  async function reqNext(we: WorldEngine) {
+    const timingDto = await fetchNextState(1, {
+      tiles: we.getTiles(),
+    } as WorldDto);
+
+    we.store.clear();
+    updateTiming(timingDto.stepMs, timingDto.loadingMs);
+
+    we.setTiles(timingDto.response.tiles);
+    setStep(stepRef.current + 1);
+  }
+
+  async function handleRequestData(f: (we: WorldEngine) => void) {
     if (isStepPendingRef.current) return;
     isStepPendingRef.current = true;
 
     const we = worldEngRef.current;
     if (we == null) return;
     try {
-      const worldDto = await fetchNextState(1, {
-        tiles: we.getTiles(),
-      } as WorldDto);
+      f(we);
 
-      we.store.clear();
-      we.setTiles(worldDto.tiles);
-      setStep(stepRef.current + 1);
+      const now = performance.now();
+      const lastTimestamp = lastStepTimestampRef.current;
+      if (lastTimestamp != null) {
+        const d = now - lastTimestamp;
+        if (d > 0) {
+          const inv = 1000 / d;
+          setActStepsPerSec((prev) =>
+            prev == null ? inv : prev + 0.3 * (inv - prev),
+          );
+        }
+      }
+      lastStepTimestampRef.current = now;
     } catch (err) {
       console.error(err);
     } finally {
@@ -207,62 +266,122 @@ export default function GameController({
     }
   }
 
+  function updateSizeDisplay(c: HTMLCanvasElement, we: WorldEngine) {
+    const rect = c.getBoundingClientRect();
+    const corner1 = we.camera.screenToWorld(rect.x, rect.y, c.width, c.height);
+    const corner2 = we.camera.screenToWorld(
+      rect.x + rect.width,
+      rect.y + rect.height,
+      c.width,
+      c.height,
+    );
+    const width = Math.floor(corner2.wx - corner1.wx);
+    const height = Math.floor(corner2.wy - corner1.wy);
+    setSizeData({ width: width, height: height });
+  }
+
   return (
     <>
-      <Card variant="outlined">
-        <Box sx={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)" }}>
-          <FormControl>
-            <FormLabel>Brush (size={paintSize})</FormLabel>
-            <Slider
-              value={paintSize}
-              onChange={(_, v) => {
-                setPaintSize(v as number);
-              }}
-              step={2}
-              min={1}
-              max={80}
-              valueLabelDisplay="auto"
-              marks
-            />
-            <RadioGroup
-              row
-              name="row-radio-buttons-group"
-              value={paintColor ? "alive" : "dead"}
-            >
-              <FormControlLabel
-                value="dead"
-                control={<Radio />}
-                label="Dead"
-                onChange={(_, v) => {
-                  setPaintColor(0);
-                }}
-              />
-              <FormControlLabel
-                value="alive"
-                control={<Radio />}
-                label="Alive"
-                onChange={(_, v) => {
-                  setPaintColor(1);
-                }}
-              />
-            </RadioGroup>
-          </FormControl>
-          <div></div>
-          <ButtonGroup variant="contained" aria-label="Basic button group">
-            <Button onClick={handleRequestData}>Get random state</Button>
-            <Button onClick={requestNextStep}>Get next state</Button>
-            <Button
-              onClick={() => {
-                setPlay(play ? false : true);
-              }}
-            >
-              {play ? "Pause simulation" : "Start simulation"}
-            </Button>
-          </ButtonGroup>
-        </Box>
-        <Container maxWidth="sm">
-          {/* <div>Brush size is {paintSize}</div> */}
-        </Container>
+      <Card variant="outlined" sx={{ p: 2 }}>
+        <Stack spacing={2}>
+          <Stack direction={{ xs: "column", md: "row" }} spacing={10}>
+            <Box sx={{ flex: 1, minWidth: 220 }}>
+              <Typography>Brush</Typography>
+              <FormControl fullWidth>
+                <FormLabel>Size {paintSize}</FormLabel>
+                <Slider
+                  value={paintSize}
+                  onChange={(_, v) => {
+                    setPaintSize(v as number);
+                  }}
+                  step={2}
+                  min={1}
+                  max={80}
+                  valueLabelDisplay="auto"
+                  marks
+                />
+              </FormControl>
+              <RadioGroup
+                row
+                name="row-radio-buttons-group"
+                value={paintColor ? "alive" : "dead"}
+                sx={{ mt: 1 }}
+              >
+                <FormControlLabel
+                  value="dead"
+                  control={<Radio />}
+                  label="Dead"
+                  onChange={(_, v) => {
+                    setPaintColor(0);
+                  }}
+                />
+                <FormControlLabel
+                  value="alive"
+                  control={<Radio />}
+                  label="Alive"
+                  onChange={(_, v) => {
+                    setPaintColor(1);
+                  }}
+                />
+              </RadioGroup>
+            </Box>
+            <Box sx={{ flex: 1, minWidth: 220 }}>
+              <Typography>Simulation</Typography>
+              <FormControl fullWidth>
+                <Stack spacing={2}>
+                  <Stack direction={{ xs: "column", md: "row" }} spacing={10}>
+                    <FormLabel>
+                      Speed {stepsPerSec} steps/s{" "}
+                      {actStepsPerSec == null
+                        ? "-"
+                        : `${actStepsPerSec.toFixed(1)} steps/s`}
+                    </FormLabel>
+                    <FormLabel>
+                      {timingData == null
+                        ? "-"
+                        : `Load: ${timingData.loadingMs}ms Simulation step: ${timingData.stepsMs}ms`}
+                    </FormLabel>
+                    <FormLabel>
+                      {sizeData == null
+                        ? "-"
+                        : `width: ${sizeData.width} height: ${sizeData.height}`}
+                    </FormLabel>
+                  </Stack>
+                </Stack>
+                <Slider
+                  value={stepsPerSec}
+                  onChange={(_, v) => {
+                    setStepsPerSec(v as number);
+                  }}
+                  step={0.5}
+                  min={0}
+                  max={30}
+                  valueLabelDisplay="auto"
+                  marks
+                />
+              </FormControl>
+              <Typography variant="caption">Step {step}</Typography>
+              <Divider></Divider>
+
+              <ButtonGroup variant="contained" aria-label="Sim controls">
+                <Button
+                  onClick={(_) => {
+                    handleRequestData(reqRandom);
+                  }}
+                >
+                  Get random state
+                </Button>
+                <Button
+                  onClick={(_) => {
+                    handleRequestData(reqNext);
+                  }}
+                >
+                  Get next state (e)
+                </Button>
+              </ButtonGroup>
+            </Box>
+          </Stack>
+        </Stack>
       </Card>
     </>
   );

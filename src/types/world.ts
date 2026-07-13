@@ -7,3 +7,9 @@ export interface TileDto {
     tileIndexY: number,
     data: Uint8Array
 }
+
+export interface TimingDto<T> {
+    stepMs: number,
+    loadingMs: number,
+    response: T
+}

@@ -1,5 +1,5 @@
 import type {CellPart} from "../types/cellPart";
-import type { WorldDto } from "../types/world";
+import type { TimingDto, WorldDto } from "../types/world";
 
 const BASE_URL = "http://localhost:8080";
 
@@ -12,40 +12,84 @@ interface RawCellPart {
 }
 
 
-export async function fetchRandomCells(): Promise<CellPart> {
-    // const searchParams = new URLSearchParams();
-    // searchParams.append("type", "all");
-    // searchParams.append("query", "coins");
-    // searchParams.toString(); // "type=all&query=coins"
-    const response = await fetch(`${BASE_URL}/world/random`)
+export async function fetchRandomCells(x: number, y: number, width: number, height: number): Promise<TimingDto<WorldDto>> {
+    const searchParams = new URLSearchParams();
+    searchParams.append("steps", "1");
+    searchParams.append("x", Math.floor(x).toString());
+    searchParams.append("y", Math.floor(y).toString());
+    searchParams.append("w", Math.floor(width).toString());
+    searchParams.append("h", Math.floor(height).toString());
+    const response = await fetch(`${BASE_URL}/world/random?` + searchParams.toString())
     if(!response.ok) {
         throw new Error("blad api");
     }
 
-    const raw = await response.json() as RawCellPart;
-
+    const raw = await response.json() as TimingDto<RawWorldDto>;
 
     return {
-        x: raw.x,
-        y: raw.y,
-        width: raw.width,
-        height: raw.height,
-        data: base64ToByteArray(raw.data),
-    };
+        stepMs: raw.stepMs,
+        loadingMs: raw.loadingMs,
+        response: {
+        tiles: raw.response.tiles.map((rawTile) => {return {
+            tileIndexX: rawTile.tileIndexX,
+            tileIndexY: rawTile.tileIndexY,
+            data: base64ToCellData(rawTile.data, 64*64)
+        }})
+    }
+    }
 }
 
+
 function base64ToByteArray(base64: string): Uint8Array {
-    var binaryString = atob(base64);
-    var bytes = new Uint8Array(binaryString.length);
-    for (var i = 0; i < binaryString.length; i++) {
+    const binaryString = atob(base64);
+    const bytes = new Uint8Array(binaryString.length);
+    for (let i = 0; i < binaryString.length; i++) {
         bytes[i] = binaryString.charCodeAt(i);
     }
     return bytes;
 }
 
 function byteArrayToBase64(data: Uint8Array): string {
-return btoa(String.fromCharCode(...data));
+    return btoa(String.fromCharCode(...data));
+}
 
+function base64ToCellData(base64: string, width: number): Uint8Array {
+    const bytes = base64ToByteArray(base64);
+    const result = new Uint8Array(width);
+
+    for (let i = 0; i < width; i++) {
+        const byteIndex = i >> 3;
+        const bitIndex = i & 7;
+        if (byteIndex < bytes.length) {
+            result[i] = (bytes[byteIndex] & (1 << bitIndex)) !== 0 ? 1 : 0;
+        }
+    }
+
+    return result;
+}
+
+function cellDataToBase64(value: Uint8Array): string {
+    let highestSetBit = -1;
+    for (let i = 0; i < value.length; i++) {
+        if (value[i]) highestSetBit = i;
+    }
+
+    if (highestSetBit === -1) {
+        return byteArrayToBase64(new Uint8Array(0));
+    }
+
+    const byteLength = (highestSetBit >> 3) + 1;
+    const bytes = new Uint8Array(byteLength);
+
+    for (let i = 0; i <= highestSetBit; i++) {
+        if (value[i]) {
+            const byteIndex = i >> 3;
+            const bitIndex = i & 7;
+            bytes[byteIndex] |= (1 << bitIndex);
+        }
+    }
+
+    return byteArrayToBase64(bytes);
 }
 
 export interface RawWorldDto {
@@ -58,7 +102,7 @@ export interface RawTileDto {
     data: string
 }
 
-export async function fetchNextState(steps: number, world: WorldDto): Promise<WorldDto> {
+export async function fetchNextState(steps: number, world: WorldDto): Promise<TimingDto<WorldDto>>  {
 
     const body = JSON.stringify({
         step: steps,
@@ -66,7 +110,7 @@ export async function fetchNextState(steps: number, world: WorldDto): Promise<Wo
             tiles: world.tiles.map((tile) => ({
             tileIndexX: tile.tileIndexX,
             tileIndexY: tile.tileIndexY,
-            data: byteArrayToBase64(tile.data),
+            data: cellDataToBase64(tile.data),
             })),
         },
         });
@@ -83,13 +127,17 @@ export async function fetchNextState(steps: number, world: WorldDto): Promise<Wo
         throw new Error("blad api");
     }
 
-    const raw = await response.json() as RawWorldDto;
+    const raw = await response.json() as TimingDto<RawWorldDto>;
 
     return {
-        tiles: raw.tiles.map((rawTile) => {return {
+        stepMs: raw.stepMs,
+        loadingMs: raw.loadingMs,
+        response: {
+        tiles: raw.response.tiles.map((rawTile) => {return {
             tileIndexX: rawTile.tileIndexX,
             tileIndexY: rawTile.tileIndexY,
-            data: base64ToByteArray(rawTile.data)
+            data: base64ToCellData(rawTile.data, 64*64)
         }})
+    }
     }
 }

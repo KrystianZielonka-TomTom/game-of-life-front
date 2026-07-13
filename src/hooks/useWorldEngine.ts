@@ -53,18 +53,6 @@ export class WorldEngine {
     this.renderer.render();
   }
 
-//   panBy(dx: number, dy: number) {
-//     this.camera.panBy(dx, dy);
-//     this.renderer.render();
-//   }
-
-//   swapCell(sx: number, sy: number, canvasW: number, canvasH: number) {
-//     const coords = this.camera.screenToWorld(sx,sy,canvasW,canvasH);
-//     this.store.swapCell(Math.floor(coords.wx), Math.floor(coords.wy));
-//     this.renderer.invalidateRegion();
-//     this.renderer.render();
-//   }
-
   setCell(sx: number, sy: number, canvasW: number, canvasH: number, state: number) {
     const coords = this.camera.screenToWorld(sx,sy,canvasW,canvasH);
     this.store.setCell(Math.floor(coords.wx), Math.floor(coords.wy), state);

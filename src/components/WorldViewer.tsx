@@ -30,7 +30,10 @@ export default function WorldViewer({
 
   return (
     <div>
-      <canvas ref={canvasRef} />
+      <canvas
+        ref={canvasRef}
+        style={{ position: "absolute", top: 0, left: 0, zIndex: -2 }}
+      />
     </div>
   );
 }
