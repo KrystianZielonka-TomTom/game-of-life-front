@@ -5,6 +5,10 @@ export class ChunkStore {
         this.store = new Map();
     }
 
+    getCount() {
+        return this.store.size
+    }
+
     getChunk(chunkX, chunkY) {
         return this.store.get(`${chunkX},${chunkY}`);
     }

@@ -1,7 +1,7 @@
 
 const MAX_ZOOM = 10;
-const MIN_ZOOM = 0.1;
-const DEFAULT_ZOOM = 3;
+const MIN_ZOOM = 1;
+const DEFAULT_ZOOM = 1.5;
 export class Camera {
     constructor() {
         this.x = 0;

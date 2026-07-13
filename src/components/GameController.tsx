@@ -43,12 +43,16 @@ export default function GameController({
   const [actStepsPerSec, setActStepsPerSec] = useState<number | null>(null);
   const [timingData, setTimingData] = useState<Timing | null>(null);
   const [sizeData, setSizeData] = useState<SizeData | null>(null);
+  const [activeChunks, setActiveChunks] = useState<number>(0);
+  const [renderTime, setRenderTime] = useState<number>(0);
+  const [requestTime, setRequestTime] = useState<number>(0);
 
   const paintColorRef = useRef(1);
   const paintSizeRef = useRef(1);
   const stepRef = useRef(0);
   const lastStepTimestampRef = useRef<number | null>(null);
   const isStepPendingRef = useRef(false);
+  const stepsPerSecRef = useRef<number>(0);
 
   useEffect(() => {
     paintColorRef.current = paintColor;
@@ -61,6 +65,10 @@ export default function GameController({
   useEffect(() => {
     stepRef.current = step;
   }, [step]);
+
+  useEffect(() => {
+    stepsPerSecRef.current = stepsPerSec;
+  }, [stepsPerSec]);
 
   useEffect(() => {
     if (stepsPerSec == 0) return;
@@ -162,7 +170,7 @@ export default function GameController({
         return;
       }
 
-      let moveFactor = 30;
+      let moveFactor = 50;
       let cx = 0;
       let cy = 0;
       if (e.key === "ArrowRight" || e.key === "d") {
@@ -219,23 +227,35 @@ export default function GameController({
     const width = corner2.wx - corner1.wx;
     const height = corner2.wy - corner1.wy;
 
-    const timingDto = await fetchRandomCells(x, y, width, height);
-    updateTiming(timingDto.stepMs, timingDto.loadingMs);
+    const spsBefore = stepsPerSecRef.current;
+    setStepsPerSec(0);
 
-    we.setTiles(timingDto.response.tiles);
-    setStep(stepRef.current + 1);
+    const timingDto = await fetchRandomCells(x, y, width, height);
+
+    setTimeout(function () {
+      updateTiming(timingDto.stepMs, timingDto.loadingMs);
+
+      we.setTiles(timingDto.response.tiles);
+      setActiveChunks(we.getActiveChunkCount());
+      setStep(stepRef.current + 1);
+      setStepsPerSec(spsBefore);
+    }, 300);
   }
 
   async function reqNext(we: WorldEngine) {
+    let before = performance.now();
     const timingDto = await fetchNextState(1, {
       tiles: we.getTiles(),
     } as WorldDto);
+    setRequestTime(performance.now() - before);
 
+    before = performance.now();
     we.store.clear();
     updateTiming(timingDto.stepMs, timingDto.loadingMs);
-
     we.setTiles(timingDto.response.tiles);
+    setActiveChunks(we.getActiveChunkCount());
     setStep(stepRef.current + 1);
+    setRenderTime(performance.now() - before);
   }
 
   async function handleRequestData(f: (we: WorldEngine) => void) {
@@ -245,7 +265,7 @@ export default function GameController({
     const we = worldEngRef.current;
     if (we == null) return;
     try {
-      f(we);
+      await f(we);
 
       const now = performance.now();
       const lastTimestamp = lastStepTimestampRef.current;
@@ -329,23 +349,26 @@ export default function GameController({
               <Typography>Simulation</Typography>
               <FormControl fullWidth>
                 <Stack spacing={2}>
-                  <Stack direction={{ xs: "column", md: "row" }} spacing={10}>
+                  <Stack direction={{ xs: "column", md: "row" }} spacing={4}>
                     <FormLabel>
                       Speed {stepsPerSec} steps/s{" "}
                       {actStepsPerSec == null
                         ? "-"
-                        : `${actStepsPerSec.toFixed(1)} steps/s`}
+                        : `(Actual ${actStepsPerSec.toFixed(1)} steps/s)`}
                     </FormLabel>
                     <FormLabel>
                       {timingData == null
                         ? "-"
-                        : `Load: ${timingData.loadingMs}ms Simulation step: ${timingData.stepsMs}ms`}
+                        : `Load:${timingData.loadingMs}ms Step:${timingData.stepsMs}ms`}
+                      {` Render:${Math.floor(renderTime)}ms`}
+                      {` Request:${Math.floor(requestTime)}ms`}
                     </FormLabel>
                     <FormLabel>
                       {sizeData == null
                         ? "-"
-                        : `width: ${sizeData.width} height: ${sizeData.height}`}
+                        : `Game board width: ${sizeData.width} height: ${sizeData.height}`}
                     </FormLabel>
+                    <FormLabel>Active chunks: {activeChunks}</FormLabel>
                   </Stack>
                 </Stack>
                 <Slider
@@ -361,7 +384,7 @@ export default function GameController({
                 />
               </FormControl>
               <Typography variant="caption">Step {step}</Typography>
-              <Divider></Divider>
+              <div></div>
 
               <ButtonGroup variant="contained" aria-label="Sim controls">
                 <Button

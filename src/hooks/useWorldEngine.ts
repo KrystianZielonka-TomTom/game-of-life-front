@@ -74,6 +74,10 @@ export class WorldEngine {
     this.renderer.invalidateRegion();
     this.renderer.render();
   }
+
+  getActiveChunkCount(): number {
+    return this.store.getCount();
+  }
 }
 
 export function useWorldEngine(
