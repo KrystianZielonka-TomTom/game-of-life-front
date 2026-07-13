@@ -88,6 +88,7 @@ export default function GameController({
     } else {
       we.renderer.enableHeatMap = false;
     }
+    we.renderer.invalidateRegion();
     we.renderer.render();
   }, [showHeat]);
 
@@ -191,7 +192,7 @@ export default function GameController({
         return;
       }
 
-      let moveFactor = 50;
+      let moveFactor = 80;
       let cx = 0;
       let cy = 0;
       if (e.key === "ArrowRight" || e.key === "d") {
@@ -298,7 +299,7 @@ export default function GameController({
         if (d > 0) {
           const inv = 1000 / d;
           setActStepsPerSec((prev) =>
-            prev == null ? inv : prev + 0.3 * (inv - prev),
+            prev == null ? inv : prev + 0.1 * (inv - prev),
           );
         }
       }

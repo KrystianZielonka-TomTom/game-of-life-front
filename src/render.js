@@ -16,7 +16,7 @@ export class Renderer {
 
     render() {
         if (this.enableHeatMap) {
-this.mainCtx.fillStyle = "black"
+            this.mainCtx.fillStyle = "black"
         } else {
             this.mainCtx.fillStyle = "white"
         }
@@ -97,7 +97,8 @@ this.mainCtx.fillStyle = "black"
         let y = 0;
         for(let i = 0; i < CHUNK_WIDTH * CHUNK_WIDTH; i++) {
             const val = chunk[i];
-            ctx.fillStyle = `rgb(0,${val},0)`
+            const col = (val * 254)/(val + 50);
+            ctx.fillStyle = `rgb(0,${col},0)`
             ctx.fillRect(x,y,1,1)
             x++;
             if(x == CHUNK_WIDTH) {
