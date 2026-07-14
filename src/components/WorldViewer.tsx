@@ -1,7 +1,6 @@
-import { useRef, useEffect } from "react";
+import { useEffect } from "react";
 import { useWorldEngine } from "../hooks/useWorldEngine";
 import type { WorldEngine } from "../hooks/useWorldEngine";
-import { ChunkStore } from "../store.js";
 
 export default function WorldViewer({
   canvasRef,

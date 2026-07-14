@@ -2,7 +2,7 @@
 import { useEffect } from "react";
 import { Camera } from "../camera.js";
 import { Renderer } from "../render.js";
-import { ChunkStore, CHUNK_WIDTH } from "../store.js";
+import { ChunkStore } from "../store.js";
 import type { TileDto } from "../types/world.js";
 
 export class WorldEngine {
@@ -17,12 +17,6 @@ export class WorldEngine {
     this.camera = new Camera();
     this.renderer = new Renderer(this.store, this.heatMapStore, ctx, this.camera, canvasW, canvasH);
   }
-
-  // loadCells(x: number, y: number, width: number, height: number, data: Uint8Array) {
-  //   this.store.storeCells(x, y, width, height, data);
-  //   this.renderer.invalidateRegion();
-  //   this.renderer.render();
-  // }
 
   getTiles(): TileDto[] {
     const tiles: TileDto[] = [];

@@ -1,7 +1,7 @@
 
 const MAX_ZOOM = 10;
-const MIN_ZOOM = 1;
-const DEFAULT_ZOOM = 1.5;
+const MIN_ZOOM = 0.2;
+const DEFAULT_ZOOM = 10;
 export class Camera {
     constructor() {
         this.x = 0;
@@ -21,16 +21,10 @@ export class Camera {
     }
 
     worldToScreen(wx, wy, canvasW, canvasH) {
-        // console.log(wx,wy,canvasW,canvasH,this.zoom,this.x,this.y)
         return {
             sx: (wx - this.x) * this.zoom + (canvasW/2),
             sy: (wy - this.y) * this.zoom + (canvasH/2)
         }
-    }
-
-    panBy(dx, dy) {
-        this.x -= dx / this.zoom;
-        this.y -= dy / this.zoom;
     }
 
     zoomAt(sx, sy, canvasW, canvasH, factor) {

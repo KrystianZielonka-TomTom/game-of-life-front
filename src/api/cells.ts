@@ -1,16 +1,8 @@
-import type {CellPart} from "../types/cellPart";
 import type { TimingDto, WorldDto } from "../types/world";
+import { CHUNK_WIDTH } from "../store.js"
 
 const BASE_URL = "http://localhost:8080";
-
-interface RawCellPart {
-    x: number;
-    y: number;
-    width: number;
-    height: number;
-    data: string;
-}
-
+const CHUNK_ARR_LENGTH = CHUNK_WIDTH * CHUNK_WIDTH;
 
 export async function fetchRandomCells(x: number, y: number, width: number, height: number): Promise<TimingDto<WorldDto>> {
     const searchParams = new URLSearchParams();
@@ -33,7 +25,7 @@ export async function fetchRandomCells(x: number, y: number, width: number, heig
         tiles: raw.response.tiles.map((rawTile) => {return {
             tileIndexX: rawTile.tileIndexX,
             tileIndexY: rawTile.tileIndexY,
-            data: base64ToCellData(rawTile.data, 64*64)
+            data: base64ToCellData(rawTile.data, CHUNK_ARR_LENGTH)
         }})
     }
     }
@@ -136,7 +128,7 @@ export async function fetchNextState(steps: number, world: WorldDto): Promise<Ti
         tiles: raw.response.tiles.map((rawTile) => {return {
             tileIndexX: rawTile.tileIndexX,
             tileIndexY: rawTile.tileIndexY,
-            data: base64ToCellData(rawTile.data, 64*64)
+            data: base64ToCellData(rawTile.data, CHUNK_ARR_LENGTH)
         }})
     }
     }

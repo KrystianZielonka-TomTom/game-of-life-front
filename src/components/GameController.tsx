@@ -2,24 +2,30 @@ import { useEffect, useState, useRef } from "react";
 import { fetchNextState, fetchRandomCells } from "../api/cells";
 import type { WorldEngine } from "../hooks/useWorldEngine";
 import type { WorldDto } from "../types/world";
-import { styled } from "styled-components";
 import {
   Box,
   Button,
   ButtonGroup,
   Card,
   Checkbox,
+  Collapse,
   Divider,
   FormControl,
   FormControlLabel,
-  FormGroup,
   FormLabel,
+  IconButton,
+  Paper,
   Radio,
   RadioGroup,
   Slider,
   Stack,
+  styled,
+  Switch,
   Typography,
 } from "@mui/material";
+import DensitySmallIcon from "@mui/icons-material/DensitySmall";
+import ArrowUpwardIcon from "@mui/icons-material/ArrowUpward";
+import { rleToWorld } from "../rleFormatter";
 
 interface Timing {
   stepsMs: number;
@@ -50,6 +56,9 @@ export default function GameController({
   const [requestTime, setRequestTime] = useState<number>(0);
   const [storeHeat, setStoreHeat] = useState<boolean>(false);
   const [showHeat, setShowHeat] = useState<boolean>(false);
+  const [showDebug, setShowDebug] = useState<boolean>(false);
+  const [showMenu, setShowMenu] = useState<boolean>(true);
+  const [multiplier, setMultiplier] = useState<number>(1);
 
   const paintColorRef = useRef(1);
   const paintSizeRef = useRef(1);
@@ -58,7 +67,11 @@ export default function GameController({
   const isStepPendingRef = useRef(false);
   const stepsPerSecRef = useRef<number>(0);
   const storeHeatRef = useRef<boolean>(false);
-  const showHeatRef = useRef<boolean>(false);
+  const multiplierRef = useRef<number>(1);
+
+  const ThemedTypography = styled(Typography)(() => ({
+    color: showHeat ? "white" : "black",
+  }));
 
   useEffect(() => {
     paintColorRef.current = paintColor;
@@ -79,6 +92,10 @@ export default function GameController({
   useEffect(() => {
     storeHeatRef.current = storeHeat;
   }, [storeHeat]);
+
+  useEffect(() => {
+    multiplierRef.current = multiplier;
+  }, [multiplier]);
 
   useEffect(() => {
     const we = worldEngRef.current;
@@ -172,23 +189,8 @@ export default function GameController({
 
     function handleKeyDown(e: KeyboardEvent) {
       e.preventDefault();
-      if (e.key == "Meta") {
-        const next = paintColorRef.current === 1 ? 0 : 1;
-        paintColorRef.current = next;
-        setPaintColor(next);
-        return;
-      } else if (e.key === "e") {
+      if (e.key === "e") {
         handleRequestData(reqNext);
-        return;
-      } else if (e.key === "=" || e.key === "+") {
-        let p = paintSizeRef.current - 2;
-        if (p < 1) p = 1;
-        setPaintSize(p);
-        return;
-      } else if (e.key === "-" || e.key === "_") {
-        let p = paintSizeRef.current + 2;
-        if (p < 1) p = 1;
-        setPaintSize(p);
         return;
       }
 
@@ -231,6 +233,11 @@ export default function GameController({
     setTimingData({ stepsMs: stepMs, loadingMs: loadingMs });
   }
 
+  async function reqPattern(we: WorldEngine) {
+    we.setTiles(rleToWorld().tiles);
+    alert("Pasted!");
+  }
+
   async function reqRandom(we: WorldEngine) {
     const c = canvasRef.current;
     if (c == null) return;
@@ -266,7 +273,7 @@ export default function GameController({
 
   async function reqNext(we: WorldEngine) {
     let before = performance.now();
-    const timingDto = await fetchNextState(1, {
+    const timingDto = await fetchNextState(multiplierRef.current, {
       tiles: we.getTiles(),
     } as WorldDto);
     setRequestTime(performance.now() - before);
@@ -279,7 +286,7 @@ export default function GameController({
     we.setTiles(timingDto.response.tiles);
     updateTiming(timingDto.stepMs, timingDto.loadingMs);
     setActiveChunks(we.getActiveChunkCount());
-    setStep(stepRef.current + 1);
+    setStep(stepRef.current + multiplierRef.current);
     setRenderTime(performance.now() - before);
   }
 
@@ -298,9 +305,7 @@ export default function GameController({
         const d = now - lastTimestamp;
         if (d > 0) {
           const inv = 1000 / d;
-          setActStepsPerSec((prev) =>
-            prev == null ? inv : prev + 0.1 * (inv - prev),
-          );
+          setActStepsPerSec((prev) => (prev == null ? inv : inv));
         }
       }
       lastStepTimestampRef.current = now;
@@ -327,122 +332,195 @@ export default function GameController({
 
   return (
     <>
-      <Card variant="outlined" sx={{ p: 2 }}>
-        <Stack spacing={2}>
-          <Stack direction={{ xs: "column", md: "row" }} spacing={10}>
+      <Collapse in={showMenu}>
+        <Card variant="outlined" sx={{ p: 2 }}>
+          <Stack
+            direction={{ xs: "column", md: "row" }}
+            sx={{ mx: 3 }}
+            spacing={10}
+          >
             <Box sx={{ flex: 1, minWidth: 220 }}>
-              <Typography>Brush</Typography>
-              <FormControl fullWidth>
-                <FormLabel>Size {paintSize}</FormLabel>
-                <Slider
-                  value={paintSize}
-                  onChange={(_, v) => {
-                    setPaintSize(v as number);
-                  }}
-                  step={2}
-                  min={1}
-                  max={80}
-                  valueLabelDisplay="auto"
-                  marks
-                />
-              </FormControl>
+              <Stack direction={{ xs: "column", md: "row" }} spacing={10}>
+                <Typography variant="h6">Brush</Typography>
+                <FormControl fullWidth>
+                  <FormLabel>Size {paintSize}</FormLabel>
+                  <Slider
+                    value={paintSize}
+                    onChange={(_, v) => {
+                      setPaintSize(v as number);
+                    }}
+                    step={2}
+                    min={1}
+                    max={80}
+                    valueLabelDisplay="auto"
+                    marks
+                  />
+                </FormControl>
+              </Stack>
               <RadioGroup
                 row
                 name="row-radio-buttons-group"
                 value={paintColor ? "alive" : "dead"}
                 sx={{ mt: 1 }}
               >
-                <FormControlLabel
-                  value="dead"
-                  control={<Radio />}
-                  label="Dead"
-                  onChange={(_, v) => {
-                    setPaintColor(0);
-                  }}
-                />
-                <FormControlLabel
-                  value="alive"
-                  control={<Radio />}
-                  label="Alive"
-                  onChange={(_, v) => {
-                    setPaintColor(1);
-                  }}
-                />
-                <FormControlLabel
-                  checked={showHeat}
-                  onChange={(_, v) => setShowHeat(v)}
-                  control={<Checkbox />}
-                  label="Show heat"
-                ></FormControlLabel>
-                <FormControlLabel
-                  checked={storeHeat}
-                  onChange={(_, v) => setStoreHeat(v)}
-                  control={<Checkbox />}
-                  label="Store heat"
-                ></FormControlLabel>
+                <Stack direction="row" spacing={5}>
+                  <div>
+                    <FormControlLabel
+                      value="dead"
+                      control={<Radio />}
+                      label="Dead"
+                      onChange={(_, v) => {
+                        setPaintColor(0);
+                      }}
+                    />
+                    <FormControlLabel
+                      value="alive"
+                      control={<Radio />}
+                      label="Alive"
+                      onChange={(_, v) => {
+                        setPaintColor(1);
+                      }}
+                    />
+                  </div>
+                  <Divider orientation="vertical" flexItem></Divider>
+                  <div>
+                    <FormControlLabel
+                      checked={showHeat}
+                      onChange={(_, v) => setShowHeat(v)}
+                      control={<Switch />}
+                      label="Show heat"
+                    ></FormControlLabel>
+                    <FormControlLabel
+                      checked={storeHeat}
+                      onChange={(_, v) => setStoreHeat(v)}
+                      control={<Switch />}
+                      label="Store heat"
+                    ></FormControlLabel>
+                  </div>
+                  <Divider orientation="vertical" flexItem></Divider>
+                  <div>
+                    <FormControlLabel
+                      checked={showDebug}
+                      onChange={(_, v) => setShowDebug(v)}
+                      control={<Switch />}
+                      label="Show debug"
+                    ></FormControlLabel>
+                  </div>
+                </Stack>
               </RadioGroup>
             </Box>
             <Box sx={{ flex: 1, minWidth: 220 }}>
-              <Typography>Simulation</Typography>
-              <FormControl fullWidth>
-                <Stack spacing={2}>
-                  <Stack direction={{ xs: "column", md: "row" }} spacing={4}>
-                    <FormLabel>
-                      Speed {stepsPerSec} steps/s{" "}
-                      {actStepsPerSec == null
-                        ? "-"
-                        : `(Actual ${actStepsPerSec.toFixed(1)} steps/s)`}
-                    </FormLabel>
-                    <FormLabel>
-                      {timingData == null
-                        ? "-"
-                        : `Load:${timingData.loadingMs}ms Step:${timingData.stepsMs}ms`}
-                      {` Render:${Math.floor(renderTime)}ms`}
-                      {` Request:${Math.floor(requestTime)}ms`}
-                    </FormLabel>
-                    <FormLabel>
-                      {sizeData == null
-                        ? "-"
-                        : `Game board width: ${sizeData.width} height: ${sizeData.height}`}
-                    </FormLabel>
-                    <FormLabel>Active chunks: {activeChunks}</FormLabel>
-                  </Stack>
-                </Stack>
-                <Slider
-                  value={stepsPerSec}
-                  onChange={(_, v) => {
-                    setStepsPerSec(v as number);
-                  }}
-                  step={0.5}
-                  min={0}
-                  max={30}
-                  valueLabelDisplay="auto"
-                  marks
-                />
-              </FormControl>
-              <Typography variant="caption">Step {step}</Typography>
-              <div></div>
+              <Stack direction={{ xs: "column", md: "row" }} spacing={10}>
+                <Typography variant="h6">Simulation</Typography>
+                <div style={{ width: "100%" }}>
+                  <FormControl fullWidth>
+                    <Stack
+                      direction={{ xs: "column", md: "row" }}
+                      sx={{ alignItems: "center", mb: 1 }}
+                      spacing={5}
+                    >
+                      <Box sx={{ flex: 1, width: "100%" }}>
+                        <FormLabel>
+                          Speed {stepsPerSec * multiplier} steps/s
+                        </FormLabel>
+                        <Slider
+                          value={stepsPerSec}
+                          onChange={(_, v) => {
+                            setStepsPerSec(v as number);
+                          }}
+                          step={0.5}
+                          min={0}
+                          max={30}
+                          valueLabelDisplay="auto"
+                          marks
+                        />
+                      </Box>
+                      <Box sx={{ flex: 1, width: "100%" }}>
+                        <FormLabel>Multiplier {multiplier}x</FormLabel>
+                        <Slider
+                          value={multiplier}
+                          onChange={(_, v) => {
+                            setMultiplier(v as number);
+                          }}
+                          step={1}
+                          min={1}
+                          max={20}
+                          valueLabelDisplay="auto"
+                          marks
+                        />
+                      </Box>
+                    </Stack>
+                    <Typography variant="caption">Step {step}</Typography>
+                  </FormControl>
 
-              <ButtonGroup variant="contained" aria-label="Sim controls">
-                <Button
-                  onClick={(_) => {
-                    handleRequestData(reqRandom);
-                  }}
-                >
-                  Get random state
-                </Button>
-                <Button
-                  onClick={(_) => {
-                    handleRequestData(reqNext);
-                  }}
-                >
-                  Get next state (e)
-                </Button>
-              </ButtonGroup>
+                  <ButtonGroup variant="contained" aria-label="Sim controls">
+                    <Button
+                      onClick={(_) => {
+                        handleRequestData(reqRandom);
+                      }}
+                    >
+                      Random
+                    </Button>
+                    <Button
+                      onClick={(_) => {
+                        handleRequestData(reqNext);
+                      }}
+                    >
+                      Next step
+                    </Button>
+                    <Button
+                      onClick={(_) => {
+                        handleRequestData(reqPattern);
+                      }}
+                    >
+                      Paste
+                    </Button>
+                  </ButtonGroup>
+                </div>
+              </Stack>
             </Box>
           </Stack>
+        </Card>
+      </Collapse>
+      <Stack spacing={2}>
+        <Stack direction={{ xs: "column", md: "row" }} spacing={5}>
+          <IconButton
+            sx={{
+              width: 48,
+              height: 48,
+              borderRadius: 0,
+              color: showHeat ? "white" : "black",
+            }}
+            onClick={(_) => setShowMenu(!showMenu)}
+          >
+            {!showMenu ? <DensitySmallIcon /> : <ArrowUpwardIcon />}
+          </IconButton>
+          {showDebug ? (
+            <>
+              <ThemedTypography>
+                {actStepsPerSec == null
+                  ? "-"
+                  : `Actual speed ${(actStepsPerSec * multiplier).toFixed(1)} steps/s`}
+              </ThemedTypography>
+              <ThemedTypography>
+                {timingData == null
+                  ? "-"
+                  : `Load:${timingData.loadingMs}ms Step(x${multiplier}):${timingData.stepsMs}ms`}
+                {` Render:${Math.floor(renderTime)}ms`}
+                {` Request:${Math.floor(requestTime)}ms`}
+              </ThemedTypography>
+              <ThemedTypography>
+                {sizeData == null
+                  ? "-"
+                  : `Game board width: ${sizeData.width} height: ${sizeData.height}`}
+              </ThemedTypography>
+              <ThemedTypography>Active chunks: {activeChunks}</ThemedTypography>
+            </>
+          ) : (
+            ""
+          )}
         </Stack>
-      </Card>
+      </Stack>
     </>
   );
 }
